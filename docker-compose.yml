@@ -20,7 +20,7 @@ services:
   configurator:
     command:
       - |
-        ls -1 apps > sites/apps.txt; bench set-config -g db_host ${DB_HOST}; bench set-config -gp db_port ${DB_PORT}; bench set-config -g redis_cache "redis://${REDIS_CACHE}"; bench set-config -g redis_queue "redis://${REDIS_QUEUE}"; bench set-config -g redis_socketio "redis://${REDIS_SOCKETIO}"; bench set-config -gp socketio_port ${SOCKETIO_PORT};
+        ls -1 apps > sites/apps.txt; bench set-config -g db_host $$DB_HOST; bench set-config -gp db_port $$DB_PORT; bench set-config -g redis_cache "redis://$$REDIS_CACHE"; bench set-config -g redis_queue "redis://$$REDIS_QUEUE"; bench set-config -g redis_socketio "redis://$$REDIS_SOCKETIO"; bench set-config -gp socketio_port $$SOCKETIO_PORT;
     depends_on:
       db:
         condition: service_healthy
@@ -112,7 +112,7 @@ services:
     environment:
       BACKEND: backend:8000
       CLIENT_MAX_BODY_SIZE: 50m
-      FRAPPE_SITE_NAME_HEADER: '${host}'
+      FRAPPE_SITE_NAME_HEADER: ${HOST}
       PROXY_READ_TIMEOUT: "120"
       SOCKETIO: websocket:9000
       UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1
