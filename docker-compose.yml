@@ -3,7 +3,6 @@ version: "3"
 services:
   backend:
     image: frappe/erpnext:v15.76.0
-    platform: linux/arm64
     networks:
       - frappe_network
     deploy:
@@ -20,7 +19,6 @@ services:
 
   configurator:
     image: frappe/erpnext:v15.76.0
-    platform: linux/arm64
     networks:
       - frappe_network
     deploy:
@@ -50,7 +48,6 @@ services:
 
   create-site:
     image: frappe/erpnext:v15.76.0
-    platform: linux/arm64
     networks:
       - frappe_network
     deploy:
@@ -84,7 +81,6 @@ services:
 
   db:
     image: mariadb:10.6
-    platform: linux/arm64
     networks:
       - frappe_network
     healthcheck:
@@ -98,7 +94,7 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --skip-character-set-client-handshake
-      - --skip-innodb-read-only-compressed
+      - --skip-innodb-read-only-compressed # Temporary fix for MariaDB 10.6
     environment:
       MYSQL_ROOT_PASSWORD: admin
       MARIADB_ROOT_PASSWORD: admin
@@ -107,7 +103,6 @@ services:
 
   frontend:
     image: frappe/erpnext:v15.76.0
-    platform: linux/arm64
     networks:
       - frappe_network
     depends_on:
@@ -129,11 +124,9 @@ services:
     volumes:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
-    # removed ports for coolify
 
   queue-long:
     image: frappe/erpnext:v15.76.0
-    platform: linux/arm64
     networks:
       - frappe_network
     deploy:
@@ -150,7 +143,6 @@ services:
 
   queue-short:
     image: frappe/erpnext:v15.76.0
-    platform: linux/arm64
     networks:
       - frappe_network
     deploy:
@@ -167,7 +159,6 @@ services:
 
   redis-queue:
     image: redis:6.2-alpine
-    platform: linux/arm64
     networks:
       - frappe_network
     deploy:
@@ -178,7 +169,6 @@ services:
 
   redis-cache:
     image: redis:6.2-alpine
-    platform: linux/arm64
     networks:
       - frappe_network
     deploy:
@@ -187,7 +177,6 @@ services:
 
   scheduler:
     image: frappe/erpnext:v15.76.0
-    platform: linux/arm64
     networks:
       - frappe_network
     deploy:
@@ -202,7 +191,6 @@ services:
 
   websocket:
     image: frappe/erpnext:v15.76.0
-    platform: linux/arm64
     networks:
       - frappe_network
     deploy:
