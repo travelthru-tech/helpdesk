@@ -1,47 +1,68 @@
-version: '3.8'
+version: "3.9"
+
 services:
   backend:
-    image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
+    image: ghcr.io/frappe/helpdesk:stable
     platform: linux/amd64
     restart: unless-stopped
-    pull_policy: ${PULL_POLICY}
+    pull_policy: missing
     depends_on:
       configurator:
         condition: service_completed_successfully
-    env_file:
-      - ./helpdesk_prod_setup.env
+    environment:
+      ERPNEXT_VERSION: ${ERPNEXT_VERSION}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      REDIS_CACHE: ${REDIS_CACHE}
+      REDIS_QUEUE: ${REDIS_QUEUE}
+      REDIS_SOCKETIO: ${REDIS_SOCKETIO}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
+      SITE_ADMIN_PASS: ${SITE_ADMIN_PASS}
+      SITES: ${SITES}
+      BACKUP_CRONSTRING: ${BACKUP_CRONSTRING}
     volumes:
       - backend-vol:/home/frappe/frappe-bench/sites
 
   configurator:
-    image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
-    command: configure
-    env_file:
-      - ./helpdesk_prod_setup.env
+    image: ghcr.io/frappe/helpdesk:stable
+    platform: linux/amd64
+    command: ["python3", "-m", "frappe.helpdesk.configurator"]
     restart: on-failure
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      REDIS_CACHE: ${REDIS_CACHE}
+      REDIS_QUEUE: ${REDIS_QUEUE}
+      REDIS_SOCKETIO: ${REDIS_SOCKETIO}
+      SITE_ADMIN_PASS: ${SITE_ADMIN_PASS}
+      SITES: ${SITES}
+    volumes:
+      - backend-vol:/home/frappe/frappe-bench/sites
 
   db:
     image: mariadb:10.6
     restart: unless-stopped
     environment:
-      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db-vol:/var/lib/mysql
 
   redis-cache:
-    image: redis:6.2-alpine
+    image: redis:6-alpine
     restart: unless-stopped
     volumes:
       - redis-cache-vol:/data
 
   redis-queue:
-    image: redis:6.2-alpine
+    image: redis:6-alpine
     restart: unless-stopped
     volumes:
       - redis-queue-vol:/data
 
   redis-socketio:
-    image: redis:6.2-alpine
+    image: redis:6-alpine
     restart: unless-stopped
     volumes:
       - redis-socketio-vol:/data
