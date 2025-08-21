@@ -1,275 +1,54 @@
-name: helpdesk_prod_setup
+version: '3.8'
 services:
   backend:
+    image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
+    platform: linux/amd64
+    restart: unless-stopped
+    pull_policy: ${PULL_POLICY}
     depends_on:
       configurator:
         condition: service_completed_successfully
-        required: true
-    image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
-    networks:
-      default: null
-    platform: linux/amd64
-    pull_policy: ${PULL_POLICY}
-    restart: unless-stopped
+    env_file:
+      - ./helpdesk_prod_setup.env
     volumes:
-      - type: volume
-        source: sites
-        target: /home/frappe/frappe-bench/sites
-        volume: {}
+      - backend-vol:/home/frappe/frappe-bench/sites
 
   configurator:
-    command:
-      - |
-        ls -1 apps > sites/apps.txt; bench set-config -g db_host $$DB_HOST; bench set-config -gp db_port $$DB_PORT; bench set-config -g redis_cache "redis://$$REDIS_CACHE"; bench set-config -g redis_queue "redis://$$REDIS_QUEUE"; bench set-config -g redis_socketio "redis://$$REDIS_SOCKETIO"; bench set-config -gp socketio_port $$SOCKETIO_PORT;
-    depends_on:
-      db:
-        condition: service_healthy
-        required: true
-      redis-cache:
-        condition: service_started
-        required: true
-      redis-queue:
-        condition: service_started
-        required: true
-      redis-socketio:
-        condition: service_started
-        required: true
-    entrypoint:
-      - bash
-      - -c
-    environment:
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      REDIS_CACHE: ${REDIS_CACHE}
-      REDIS_QUEUE: ${REDIS_QUEUE}
-      REDIS_SOCKETIO: ${REDIS_SOCKETIO}
-      SOCKETIO_PORT: "9000"
     image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
-    networks:
-      default: null
-    platform: linux/amd64
-    pull_policy: ${PULL_POLICY}
+    command: configure
+    env_file:
+      - ./helpdesk_prod_setup.env
     restart: on-failure
-    volumes:
-      - type: volume
-        source: sites
-        target: /home/frappe/frappe-bench/sites
-        volume: {}
-
-  cron:
-    command:
-      - daemon
-      - --docker
-    depends_on:
-      scheduler:
-        condition: service_started
-        required: true
-    image: mcuadros/ofelia:latest
-    networks:
-      default: null
-    volumes:
-      - type: bind
-        source: /var/run/docker.sock
-        target: /var/run/docker.sock
-        read_only: true
-        bind:
-          create_host_path: true
 
   db:
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-      - --skip-character-set-client-handshake
-      - --skip-innodb-read-only-compressed
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - mysqladmin ping -h localhost --password=${DB_PASSWORD}
-      interval: 1s
-      retries: 20
     image: mariadb:10.6
-    networks:
-      default: null
     restart: unless-stopped
-    volumes:
-      - type: volume
-        source: db-data
-        target: /var/lib/mysql
-        volume: {}
-
-  frontend:
-    command:
-      - nginx-entrypoint.sh
-    depends_on:
-      backend:
-        condition: service_started
-        required: true
-      websocket:
-        condition: service_started
-        required: true
     environment:
-      BACKEND: backend:8000
-      CLIENT_MAX_BODY_SIZE: 50m
-      FRAPPE_SITE_NAME_HEADER: ${HOST}
-      PROXY_READ_TIMEOUT: "120"
-      SOCKETIO: websocket:9000
-      UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1
-      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
-      UPSTREAM_REAL_IP_RECURSIVE: "off"
-    image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
-    networks:
-      default: null
-    platform: linux/amd64
-    pull_policy: ${PULL_POLICY}
-    restart: unless-stopped
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
     volumes:
-      - type: volume
-        source: sites
-        target: /home/frappe/frappe-bench/sites
-        volume: {}
-
-  queue-long:
-    command:
-      - bench
-      - worker
-      - --queue
-      - long,default,short
-    depends_on:
-      configurator:
-        condition: service_completed_successfully
-        required: true
-    image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
-    networks:
-      default: null
-    platform: linux/amd64
-    pull_policy: ${PULL_POLICY}
-    restart: unless-stopped
-    volumes:
-      - type: volume
-        source: sites
-        target: /home/frappe/frappe-bench/sites
-        volume: {}
-
-  queue-short:
-    command:
-      - bench
-      - worker
-      - --queue
-      - short,default
-    depends_on:
-      configurator:
-        condition: service_completed_successfully
-        required: true
-    image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
-    networks:
-      default: null
-    platform: linux/amd64
-    pull_policy: ${PULL_POLICY}
-    restart: unless-stopped
-    volumes:
-      - type: volume
-        source: sites
-        target: /home/frappe/frappe-bench/sites
-        volume: {}
+      - db-vol:/var/lib/mysql
 
   redis-cache:
     image: redis:6.2-alpine
-    networks:
-      default: null
     restart: unless-stopped
+    volumes:
+      - redis-cache-vol:/data
 
   redis-queue:
     image: redis:6.2-alpine
-    networks:
-      default: null
     restart: unless-stopped
     volumes:
-      - type: volume
-        source: redis-queue-data
-        target: /data
-        volume: {}
+      - redis-queue-vol:/data
 
   redis-socketio:
     image: redis:6.2-alpine
-    networks:
-      default: null
-    restart: unless-stopped
-
-  scheduler:
-    command:
-      - bench
-      - schedule
-    depends_on:
-      configurator:
-        condition: service_completed_successfully
-        required: true
-    image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
-    labels:
-      ofelia.enabled: "true"
-      ofelia.job-exec.datecron.command: bench --site all backup
-      ofelia.job-exec.datecron.schedule: ${BACKUP_CRONSTRING}
-      ofelia.job-exec.datecron.user: frappe
-    networks:
-      default: null
-    platform: linux/amd64
-    pull_policy: ${PULL_POLICY}
     restart: unless-stopped
     volumes:
-      - type: volume
-        source: sites
-        target: /home/frappe/frappe-bench/sites
-        volume: {}
-
-  websocket:
-    command:
-      - node
-      - /home/frappe/frappe-bench/apps/frappe/socketio.js
-    depends_on:
-      configurator:
-        condition: service_completed_successfully
-        required: true
-    image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
-    networks:
-      default: null
-    platform: linux/amd64
-    pull_policy: ${PULL_POLICY}
-    restart: unless-stopped
-    volumes:
-      - type: volume
-        source: sites
-        target: /home/frappe/frappe-bench/sites
-        volume: {}
-
-networks:
-  default:
-    name: helpdesk_prod_setup_default
+      - redis-socketio-vol:/data
 
 volumes:
-  db-data:
-    name: helpdesk_prod_setup_db-data
-  redis-queue-data:
-    name: helpdesk_prod_setup_redis-queue-data
-  sites:
-    name: helpdesk_prod_setup_sites
-
-x-backend-defaults:
-  depends_on:
-    configurator:
-      condition: service_completed_successfully
-  image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
-  pull_policy: ${PULL_POLICY}
-  restart: unless-stopped
-  volumes:
-    - sites:/home/frappe/frappe-bench/sites
-
-x-customizable-image:
-  image: ${CUSTOM_IMAGE}:${CUSTOM_TAG}
-  pull_policy: ${PULL_POLICY}
-  restart: unless-stopped
-
-x-depends-on-configurator:
-  depends_on:
-    configurator:
-      condition: service_completed_successfully
+  backend-vol:
+  db-vol:
+  redis-cache-vol:
+  redis-queue-vol:
+  redis-socketio-vol:
